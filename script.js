@@ -425,10 +425,39 @@
            handled gracefully. `type: "career"` is kept on each entry so
            other series (e.g. "interview", "cv") can be swapped back in
            without restructuring this array. */
-        const DEFAULT_HOOK_READ_TIME = 3000;
         const DEFAULT_TEXT_READ_TIME = 4500;
         const DEFAULT_IMAGE_READ_TIME = 4500;
         const DEFAULT_WHY_READ_TIME = 8000;
+
+        /* ============ PROMPT (HOOK) TIMING — word-count based ============ */
+        /* The "prompt" is the hook-stage text that gets read aloud by an AI
+           voiceover in the final edited video. Its on-screen time has to
+           cover: the full narration + a cushion for reading along + a short
+           breathing beat before the timer bar/tick countdown hits zero and
+           the screen transitions.
+
+           HOW TO REUSE THIS FOR FUTURE PROMPTS:
+           Just add a new tip to `tips` with a `prompt` string — you do NOT
+           need to hand-calculate a duration. `calculatePromptReadTime()`
+           below is called automatically for any tip whose `hookReadTime`
+           isn't explicitly set, and scales with that prompt's word count.
+           Only set `hookReadTime` on a tip directly if you need to
+           override the automatic value (e.g. the voiceover take for that
+           line runs unusually slow/fast). The four tips below currently
+           have explicit `hookReadTime` values pre-computed by this same
+           formula, purely so the numbers are visible/tunable at a glance —
+           delete any of them and the formula will fill the gap. */
+        const VOICEOVER_WORDS_PER_MINUTE = 150;      // natural, unhurried AI narration pace
+        const READING_COMPREHENSION_BUFFER_MS = 800;  // cushion for reading along while listening
+        const TRANSITION_BREATHING_ROOM_MS = 1200;    // pause after narration ends, before transition
+        const MIN_PROMPT_READ_TIME_MS = 3500;         // floor so even a very short prompt isn't rushed
+
+        function calculatePromptReadTime(text) {
+            const wordCount = (text || '').trim().split(/\s+/).filter(Boolean).length;
+            const voiceoverMs = (wordCount / VOICEOVER_WORDS_PER_MINUTE) * 60000;
+            const total = voiceoverMs + READING_COMPREHENSION_BUFFER_MS + TRANSITION_BREATHING_ROOM_MS;
+            return Math.round(Math.max(total, MIN_PROMPT_READ_TIME_MS));
+        }
 
 const tips = [
             {
@@ -446,7 +475,8 @@ const tips = [
                     source: "Harvard Business Review, Workplace Communication",
                     readTime: 9000
                 },
-                readTime: 6500
+                readTime: 6500,
+                hookReadTime: 10000 // 20-word prompt: ~8s voiceover + 0.8s read buffer + 1.2s breathing room
             },
             {
                 type: "career",
@@ -463,7 +493,8 @@ const tips = [
                     source: "Society for Human Resource Management (SHRM)",
                     readTime: 9000
                 },
-                readTime: 6000
+                readTime: 6000,
+                hookReadTime: 9200 // 18-word prompt: ~7.2s voiceover + 0.8s read buffer + 1.2s breathing room
             },
             {
                 type: "career",
@@ -480,7 +511,8 @@ const tips = [
                     source: "Gallup, State of the Global Workplace",
                     readTime: 9000
                 },
-                readTime: 6000
+                readTime: 6000,
+                hookReadTime: 8400 // 16-word prompt: ~6.4s voiceover + 0.8s read buffer + 1.2s breathing room
             },
             {
                 type: "career",
@@ -497,7 +529,8 @@ const tips = [
                     source: "Harvard Business Review, Workplace Feedback Research",
                     readTime: 9000
                 },
-                readTime: 5500
+                readTime: 5500,
+                hookReadTime: 10000 // 20-word prompt: ~8s voiceover + 0.8s read buffer + 1.2s breathing room
             }
         ];
 
@@ -631,7 +664,7 @@ const tips = [
         function runHookStage(tip) {
             setActiveStage('hook');
             AudioManager.playSwoosh('reveal', { startFreq: 1700, endFreq: 450, duration: 0.3, volume: 0.22 });
-            const duration = tip.hookReadTime || DEFAULT_HOOK_READ_TIME;
+            const duration = tip.hookReadTime || calculatePromptReadTime(tip.prompt);
             startTimerBar(duration, () => runContentStage(tip));
         }
 
